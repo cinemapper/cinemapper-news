@@ -162,44 +162,12 @@
 </template>
 
 <script setup>
-// Client-side data fetching for static generation
-const articles = ref({})
-const pending = ref(true)
-const error = ref(null)
-
-// Only fetch data on client-side
-onMounted(async () => {
-  if (process.client) {
-    try {
-      pending.value = true
-      
-      // Use the new Firebase initialization method
-      const { getFirebaseServices } = await import('~/lib/firebase')
-      const { db } = await getFirebaseServices()
-      const { ref: dbRef, get } = await import('firebase/database')
-      
-      if (db) {
-        const snap = await get(dbRef(db, 'articles'))
-        if (snap.exists()) {
-          const allArticles = snap.val()
-          // Filter to only show published articles
-          const publishedArticles = {}
-          Object.keys(allArticles).forEach(id => {
-            const article = allArticles[id]
-            if (article.published && !article.previewOnly) {
-              publishedArticles[id] = article
-            }
-          })
-          articles.value = publishedArticles
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching articles:', err)
-      error.value = err
-    } finally {
-      pending.value = false
-    }
-  }
+// Server-side data fetching for SEO
+const { data: articles, pending, error } = await useFetch('/api/articles', {
+  server: true,
+  client: true,
+  default: () => ({}),
+  transform: (data) => data || {}
 })
 
 // Computed properties for display
@@ -230,44 +198,6 @@ const displayArticles = computed(() => {
 })
 
 // Utility functions
-function getExcerpt(markdown, maxLength = 150) {
-  if (!markdown) return ''
-
-  // First, clean up the markdown by adding proper spacing
-  let cleaned = markdown
-    // Add line breaks after headers
-    .replace(/^(#{1,6})\s*(.+)$/gm, '$1 $2\n')
-    // Add line breaks after list items
-    .replace(/^[-*+]\s*(.+)$/gm, '• $1\n')
-    // Add spacing between sections
-    .replace(/##\s*(.+)/g, '\n$1:')
-    // Clean up multiple line breaks
-    .replace(/\n{3,}/g, '\n\n')
-    // Remove markdown syntax
-    .replace(/[#*`_~\[\]()]/g, '')
-    // Clean up extra spaces
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  // Truncate to desired length
-  if (cleaned.length > maxLength) {
-    // Try to break at a sentence or word boundary
-    let truncated = cleaned.slice(0, maxLength)
-    const lastSpace = truncated.lastIndexOf(' ')
-    const lastSentence = truncated.lastIndexOf('.')
-
-    if (lastSentence > maxLength - 50) {
-      return truncated.slice(0, lastSentence + 1)
-    } else if (lastSpace > maxLength - 20) {
-      return truncated.slice(0, lastSpace) + '...'
-    } else {
-      return truncated + '...'
-    }
-  }
-
-  return cleaned
-}
-
 function formatDate(timestamp) {
   const date = new Date(timestamp)
   return date.toLocaleDateString('en-US', {
@@ -282,31 +212,27 @@ function getCategory(tags) {
   return tags[0].charAt(0).toUpperCase() + tags[0].slice(1)
 }
 
+function getExcerpt(content, length = 120) {
+  if (!content) return ''
+  const text = content.replace(/[#*`]/g, '').replace(/\n/g, ' ')
+  return text.slice(0, length) + (text.length > length ? '...' : '')
+}
+
 // SEO Meta Tags
 useHead({
-  title: 'CineMapper News - Latest Updates and Press Releases',
+  title: 'CineMapper News | Latest Updates and Stories',
   meta: [
-    { name: 'description', content: 'Stay updated with the latest news, press releases, and announcements from CineMapper. Discover new features, partnerships, and industry insights.' },
-    { name: 'robots', content: 'index, follow' },
-    { name: 'author', content: 'CineMapper' },
-    { name: 'keywords', content: 'cinemapper, news, updates, press releases, announcements, film industry' },
-
-    // Open Graph
-    { property: 'og:title', content: 'CineMapper News - Latest Updates and Press Releases' },
-    { property: 'og:description', content: 'Stay updated with the latest news, press releases, and announcements from CineMapper.' },
-    { property: 'og:image', content: 'https://news.cinemapper.com/img/default-og-image.jpg' },
-    { property: 'og:type', content: 'website' },
+    { name: 'description', content: 'Stay updated with the latest news, updates, and stories from CineMapper. Discover what\'s happening in our community.' },
+    { name: 'keywords', content: 'cinemapper, news, updates, stories, community, latest' },
+    { property: 'og:title', content: 'CineMapper News | Latest Updates and Stories' },
+    { property: 'og:description', content: 'Stay updated with the latest news, updates, and stories from CineMapper. Discover what\'s happening in our community.' },
+    { property: 'og:image', content: '/img/default-og-image.jpg' },
     { property: 'og:url', content: 'https://news.cinemapper.com' },
-
-    // Twitter Card
+    { property: 'og:type', content: 'website' },
     { name: 'twitter:card', content: 'summary_large_image' },
-    { name: 'twitter:title', content: 'CineMapper News - Latest Updates and Press Releases' },
-    { name: 'twitter:description', content: 'Stay updated with the latest news, press releases, and announcements from CineMapper.' },
-    { name: 'twitter:image', content: 'https://news.cinemapper.com/img/default-og-image.jpg' },
-  ],
-  link: [
-    { rel: 'canonical', href: 'https://news.cinemapper.com' },
-    { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
+    { name: 'twitter:title', content: 'CineMapper News | Latest Updates and Stories' },
+    { name: 'twitter:description', content: 'Stay updated with the latest news, updates, and stories from CineMapper.' },
+    { name: 'twitter:image', content: '/img/default-og-image.jpg' }
   ]
 })
 </script>
