@@ -114,40 +114,12 @@ import { computed } from 'vue'
 const route = useRoute()
 const id = route.params.id
 
-// Client-side data fetching for static generation
-const article = ref(null)
-const pending = ref(true)
-const error = ref(null)
-
-// Only fetch data on client-side
-onMounted(async () => {
-  if (process.client) {
-    try {
-      pending.value = true
-      
-      // Use the new Firebase initialization method
-      const { getFirebaseServices } = await import('~/lib/firebase')
-      const { db } = await getFirebaseServices()
-      const { ref: dbRef, get } = await import('firebase/database')
-      
-      if (db) {
-        const snap = await get(dbRef(db, `articles/${id}`))
-        if (snap.exists()) {
-          const articleData = snap.val()
-          
-          // Check if article is published and not preview-only
-          if (articleData.published && !articleData.previewOnly) {
-            article.value = articleData
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching article:', err)
-      error.value = err
-    } finally {
-      pending.value = false
-    }
-  }
+// Server-side data fetching using the REST API
+const { data: article, pending, error } = await useFetch(`/api/articles/${id}`, {
+  server: true,
+  client: true,
+  default: () => null,
+  transform: (data) => data || null
 })
 
 // Convert Markdown to HTML
@@ -205,7 +177,7 @@ function shareArticle() {
   }
 }
 
-// SEO Meta Tags
+// SEO Meta Tags - These will be rendered server-side
 const seoTitle = computed(() => {
   if (!article.value) return 'CineMapper News'
   return `${article.value.title} | CineMapper News`
@@ -227,7 +199,11 @@ const ogImage = computed(() => {
   return article.value?.meta?.ogImage || '/img/default-og-image.jpg'
 })
 
-// Set page meta tags
+const canonicalUrl = computed(() => {
+  return `https://news.cinemapper.com/article/${id}`
+})
+
+// Set page meta tags - These will be available for crawlers
 useHead({
   title: seoTitle,
   meta: [
@@ -245,40 +221,33 @@ useHead({
     { property: 'og:image:height', content: '630' },
     { property: 'og:image:alt', content: seoTitle },
     { property: 'og:type', content: 'article' },
-    { property: 'og:url', content: `https://news.cinemapper.com/article/${id}` },
+    { property: 'og:url', content: canonicalUrl },
     { property: 'og:site_name', content: 'CineMapper News' },
     { property: 'og:locale', content: 'en_US' },
-    { property: 'og:article:author', content: computed(() => article.value?.author || 'CineMapper') },
-    { property: 'og:article:section', content: 'News' },
-    { property: 'og:article:tag', content: computed(() => article.value?.tags ? article.value.tags.join(', ') : '') },
-    { property: 'og:article:published_time', content: computed(() => article.value?.createdAt ? new Date(article.value.createdAt).toISOString() : '') },
-    { property: 'og:article:modified_time', content: computed(() => article.value?.updatedAt ? new Date(article.value.updatedAt).toISOString() : '') },
 
     // Twitter Card
     { name: 'twitter:card', content: 'summary_large_image' },
+    { name: 'twitter:site', content: '@cinemapper' },
+    { name: 'twitter:creator', content: computed(() => article.value?.author ? `@${article.value.author}` : '@cinemapper') },
     { name: 'twitter:title', content: seoTitle },
     { name: 'twitter:description', content: seoDescription },
     { name: 'twitter:image', content: ogImage },
-    { name: 'twitter:image:alt', content: seoTitle },
-    { name: 'twitter:site', content: '@cinemapper' }, // Replace with actual Twitter handle
-    { name: 'twitter:creator', content: '@cinemapper' }, // Replace with actual Twitter handle
+
+    // Article-specific meta
+    { property: 'article:published_time', content: computed(() => article.value ? new Date(article.value.createdAt).toISOString() : '') },
+    { property: 'article:modified_time', content: computed(() => article.value ? new Date(article.value.updatedAt || article.value.createdAt).toISOString() : '') },
+    { property: 'article:author', content: computed(() => article.value?.author || 'CineMapper') },
+    { property: 'article:section', content: computed(() => getCategory(article.value?.tags)) },
+    { property: 'article:tag', content: computed(() => article.value?.tags ? article.value.tags.join(', ') : '') },
 
     // Additional SEO
-    { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-    { name: 'format-detection', content: 'telephone=no' },
-    { name: 'theme-color', content: '#1f2937' },
-
-    // Article Schema.org structured data hints
-    { property: 'article:published_time', content: computed(() => article.value?.createdAt ? new Date(article.value.createdAt).toISOString() : '') },
-    { property: 'article:modified_time', content: computed(() => article.value?.updatedAt ? new Date(article.value.updatedAt).toISOString() : '') },
-    { property: 'article:author', content: computed(() => article.value?.author || 'CineMapper') },
-    { property: 'article:section', content: 'News' },
-    { property: 'article:tag', content: computed(() => article.value?.tags ? article.value.tags.join(', ') : '') },
+    { name: 'theme-color', content: '#dc2626' },
+    { name: 'msapplication-TileColor', content: '#dc2626' },
   ],
   link: [
-    { rel: 'canonical', href: `https://news.cinemapper.com/article/${id}` },
+    { rel: 'canonical', href: canonicalUrl },
     { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
-    { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+    { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' }
   ]
 })
 </script>

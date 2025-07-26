@@ -4,8 +4,8 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxtjs/tailwindcss', '@pinia/nuxt'],
 
-  // SPA mode to avoid all SSR/prerendering issues with Firebase
-  ssr: false,
+  // Enable SSR for proper SEO meta tags
+  ssr: true,
 
   devServer: {
     port: 3001
