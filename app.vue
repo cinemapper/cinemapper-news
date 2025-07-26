@@ -1,7 +1,9 @@
 <template>
-  <NuxtPage />
+  <div>
+    <NuxtPage />
+  </div>
 </template>
 
 <script setup>
-// Main app component for CineMapper News
+// Minimal app component for CineMapper News - safe for prerendering
 </script>

@@ -1,9 +1,10 @@
-import { useState } from '#app'
+import { ref } from 'vue'
 
 export function useFirebaseAuth() {
-  const user = useState('fbUser', () => null)
+  // Use a simple ref for SPA mode - no SSR issues
+  const user = ref(null)
 
-  // Client-side only Firebase operations
+  // Only run on client-side
   if (process.client) {
     // Use the new Firebase initialization method
     import('~/lib/firebase').then(async ({ getFirebaseServices }) => {
@@ -15,6 +16,8 @@ export function useFirebaseAuth() {
           user.value = u
         })
       }
+    }).catch(error => {
+      console.error('Failed to initialize Firebase auth:', error)
     })
   }
 
