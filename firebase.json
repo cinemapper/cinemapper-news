@@ -1,0 +1,41 @@
+{
+  "functions": { 
+    "source": ".output/server" 
+  },
+  "hosting": {
+    "site": "cinemapper-news",
+    "public": ".output/public",
+    "cleanUrls": true,
+    "rewrites": [
+      { 
+        "source": "**", 
+        "function": "server" 
+      }
+    ],
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|css|woff|woff2)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=31536000"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(jpg|jpeg|gif|png|svg|webp)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=86400"
+          }
+        ]
+      }
+    ]
+  }
+} 
