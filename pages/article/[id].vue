@@ -117,30 +117,32 @@ import { marked } from 'marked'
 const route = useRoute()
 const id = route.params.id
 
-// Server-side data fetching with Firebase Functions SSR
+// Client-side data fetching to avoid SSR Firebase issues
 const { data: article, pending, error } = await useAsyncData(
   `article-${id}`,
   async () => {
-    try {
-      const snap = await get(dbRef(db, `articles/${id}`))
-      if (snap.exists()) {
-        const articleData = snap.val()
-        
-        // Check if article is published and not preview-only
-        if (!articleData.published || articleData.previewOnly) {
-          return null // Article not found for public access
+    // Only run on client-side to avoid Firebase issues during static generation
+    if (process.client) {
+      try {
+        const snap = await get(dbRef(db, `articles/${id}`))
+        if (snap.exists()) {
+          const articleData = snap.val()
+          
+          // Check if article is published and not preview-only
+          if (!articleData.published || articleData.previewOnly) {
+            return null // Article not found for public access
+          }
+          
+          return articleData
         }
-        
-        return articleData
+      } catch (err) {
+        console.error('Error fetching article:', err)
       }
-      return null
-    } catch (err) {
-      console.error('Error fetching article:', err)
-      return null
     }
+    return null
   },
   {
-    server: true, // Enable server-side rendering with Firebase Functions
+    server: false, // Client-side only to avoid 500 errors
     client: true,
     default: () => null
   }

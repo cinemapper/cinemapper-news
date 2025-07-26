@@ -4,6 +4,11 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxtjs/tailwindcss', '@pinia/nuxt'],
   
+  // Static generation to avoid Firebase SDK issues during SSR
+  nitro: {
+    preset: 'static'
+  },
+  
   devServer: {
     port: 3001
   }

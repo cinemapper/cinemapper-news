@@ -166,32 +166,34 @@ import { db } from '~/lib/firebase'
 import { ref as dbRef, get } from 'firebase/database'
 import { marked } from 'marked'
 
-// Server-side data fetching with Firebase Functions SSR
+// Client-side data fetching to avoid SSR Firebase issues
 const { data: articles, pending, error } = await useAsyncData(
   'articles',
   async () => {
-    try {
-      const snap = await get(dbRef(db, 'articles'))
-      if (snap.exists()) {
-        const allArticles = snap.val()
-        // Filter to only show published articles
-        const publishedArticles = {}
-        Object.keys(allArticles).forEach(id => {
-          const article = allArticles[id]
-          if (article.published && !article.previewOnly) {
-            publishedArticles[id] = article
-          }
-        })
-        return publishedArticles
+    // Only run on client-side to avoid Firebase issues during static generation
+    if (process.client) {
+      try {
+        const snap = await get(dbRef(db, 'articles'))
+        if (snap.exists()) {
+          const allArticles = snap.val()
+          // Filter to only show published articles
+          const publishedArticles = {}
+          Object.keys(allArticles).forEach(id => {
+            const article = allArticles[id]
+            if (article.published && !article.previewOnly) {
+              publishedArticles[id] = article
+            }
+          })
+          return publishedArticles
+        }
+      } catch (err) {
+        console.error('Error fetching articles:', err)
       }
-      return {}
-    } catch (err) {
-      console.error('Error fetching articles:', err)
-      return {}
     }
+    return {}
   },
   {
-    server: true, // Enable server-side rendering with Firebase Functions
+    server: false, // Client-side only to avoid 500 errors
     client: true,
     default: () => ({})
   }
