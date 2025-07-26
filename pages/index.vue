@@ -162,17 +162,22 @@
 </template>
 
 <script setup>
-import { db } from '~/lib/firebase'
-import { ref as dbRef, get } from 'firebase/database'
-import { marked } from 'marked'
+// Client-side data fetching for static generation
+const articles = ref({})
+const pending = ref(true)
+const error = ref(null)
 
-// Client-side data fetching to avoid SSR Firebase issues
-const { data: articles, pending, error } = await useAsyncData(
-  'articles',
-  async () => {
-    // Only run on client-side to avoid Firebase issues during static generation
-    if (process.client) {
-      try {
+// Only fetch data on client-side
+onMounted(async () => {
+  if (process.client) {
+    try {
+      pending.value = true
+      
+      // Dynamic imports to avoid SSR issues
+      const { db } = await import('~/lib/firebase')
+      const { ref: dbRef, get } = await import('firebase/database')
+      
+      if (db) {
         const snap = await get(dbRef(db, 'articles'))
         if (snap.exists()) {
           const allArticles = snap.val()
@@ -184,29 +189,26 @@ const { data: articles, pending, error } = await useAsyncData(
               publishedArticles[id] = article
             }
           })
-          return publishedArticles
+          articles.value = publishedArticles
         }
-      } catch (err) {
-        console.error('Error fetching articles:', err)
       }
+    } catch (err) {
+      console.error('Error fetching articles:', err)
+      error.value = err
+    } finally {
+      pending.value = false
     }
-    return {}
-  },
-  {
-    server: false, // Client-side only to avoid 500 errors
-    client: true,
-    default: () => ({})
   }
-)
+})
 
 // Computed properties for display
 const latestArticleId = computed(() => {
   if (!articles.value || Object.keys(articles.value).length === 0) return null
-  
+
   const sortedIds = Object.keys(articles.value).sort((a, b) => {
     return articles.value[b].createdAt - articles.value[a].createdAt
   })
-  
+
   return sortedIds[0]
 })
 
@@ -217,19 +219,19 @@ const latestArticle = computed(() => {
 
 const displayArticles = computed(() => {
   if (!articles.value) return {}
-  
+
   const displayArticles = { ...articles.value }
   if (latestArticleId.value) {
     delete displayArticles[latestArticleId.value]
   }
-  
+
   return displayArticles
 })
 
 // Utility functions
 function getExcerpt(markdown, maxLength = 150) {
   if (!markdown) return ''
-  
+
   // First, clean up the markdown by adding proper spacing
   let cleaned = markdown
     // Add line breaks after headers
@@ -245,14 +247,14 @@ function getExcerpt(markdown, maxLength = 150) {
     // Clean up extra spaces
     .replace(/\s+/g, ' ')
     .trim()
-  
+
   // Truncate to desired length
   if (cleaned.length > maxLength) {
     // Try to break at a sentence or word boundary
     let truncated = cleaned.slice(0, maxLength)
     const lastSpace = truncated.lastIndexOf(' ')
     const lastSentence = truncated.lastIndexOf('.')
-    
+
     if (lastSentence > maxLength - 50) {
       return truncated.slice(0, lastSentence + 1)
     } else if (lastSpace > maxLength - 20) {
@@ -261,7 +263,7 @@ function getExcerpt(markdown, maxLength = 150) {
       return truncated + '...'
     }
   }
-  
+
   return cleaned
 }
 
@@ -287,14 +289,14 @@ useHead({
     { name: 'robots', content: 'index, follow' },
     { name: 'author', content: 'CineMapper' },
     { name: 'keywords', content: 'cinemapper, news, updates, press releases, announcements, film industry' },
-    
+
     // Open Graph
     { property: 'og:title', content: 'CineMapper News - Latest Updates and Press Releases' },
     { property: 'og:description', content: 'Stay updated with the latest news, press releases, and announcements from CineMapper.' },
     { property: 'og:image', content: 'https://news.cinemapper.com/img/default-og-image.jpg' },
     { property: 'og:type', content: 'website' },
     { property: 'og:url', content: 'https://news.cinemapper.com' },
-    
+
     // Twitter Card
     { name: 'twitter:card', content: 'summary_large_image' },
     { name: 'twitter:title', content: 'CineMapper News - Latest Updates and Press Releases' },

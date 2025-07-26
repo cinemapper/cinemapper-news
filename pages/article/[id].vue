@@ -110,48 +110,56 @@
 
 <script setup>
 import { computed } from 'vue'
-import { db } from '~/lib/firebase'
-import { ref as dbRef, get } from 'firebase/database'
-import { marked } from 'marked'
 
 const route = useRoute()
 const id = route.params.id
 
-// Client-side data fetching to avoid SSR Firebase issues
-const { data: article, pending, error } = await useAsyncData(
-  `article-${id}`,
-  async () => {
-    // Only run on client-side to avoid Firebase issues during static generation
-    if (process.client) {
-      try {
+// Client-side data fetching for static generation
+const article = ref(null)
+const pending = ref(true)
+const error = ref(null)
+
+// Only fetch data on client-side
+onMounted(async () => {
+  if (process.client) {
+    try {
+      pending.value = true
+      
+      // Dynamic imports to avoid SSR issues
+      const { db } = await import('~/lib/firebase')
+      const { ref: dbRef, get } = await import('firebase/database')
+      
+      if (db) {
         const snap = await get(dbRef(db, `articles/${id}`))
         if (snap.exists()) {
           const articleData = snap.val()
           
           // Check if article is published and not preview-only
-          if (!articleData.published || articleData.previewOnly) {
-            return null // Article not found for public access
+          if (articleData.published && !articleData.previewOnly) {
+            article.value = articleData
           }
-          
-          return articleData
         }
-      } catch (err) {
-        console.error('Error fetching article:', err)
       }
+    } catch (err) {
+      console.error('Error fetching article:', err)
+      error.value = err
+    } finally {
+      pending.value = false
     }
-    return null
-  },
-  {
-    server: false, // Client-side only to avoid 500 errors
-    client: true,
-    default: () => null
   }
-)
+})
 
 // Convert Markdown to HTML
 const renderedContent = computed(() => {
   if (!article.value || !article.value.content) return ''
-  return marked(article.value.content)
+  
+  // Use marked safely on client-side
+  if (process.client) {
+    const { marked } = require('marked')
+    return marked(article.value.content)
+  }
+  
+  return article.value.content
 })
 
 // Utility functions
@@ -212,9 +220,9 @@ useHead({
     // Basic SEO
     { name: 'description', content: seoDescription },
     { name: 'robots', content: 'index, follow' },
-    { name: 'author', content: article.value?.author || 'CineMapper' },
-    { name: 'keywords', content: article.value?.tags ? article.value.tags.join(', ') : 'cinemapper, news, updates' },
-    
+    { name: 'author', content: computed(() => article.value?.author || 'CineMapper') },
+    { name: 'keywords', content: computed(() => article.value?.tags ? article.value.tags.join(', ') : 'cinemapper, news, updates') },
+
     // Open Graph (Facebook, LinkedIn, etc.)
     { property: 'og:title', content: seoTitle },
     { property: 'og:description', content: seoDescription },
@@ -226,12 +234,12 @@ useHead({
     { property: 'og:url', content: `https://news.cinemapper.com/article/${id}` },
     { property: 'og:site_name', content: 'CineMapper News' },
     { property: 'og:locale', content: 'en_US' },
-    { property: 'og:article:author', content: article.value?.author || 'CineMapper' },
+    { property: 'og:article:author', content: computed(() => article.value?.author || 'CineMapper') },
     { property: 'og:article:section', content: 'News' },
-    { property: 'og:article:tag', content: article.value?.tags ? article.value.tags.join(', ') : '' },
-    { property: 'og:article:published_time', content: article.value?.createdAt ? new Date(article.value.createdAt).toISOString() : '' },
-    { property: 'og:article:modified_time', content: article.value?.updatedAt ? new Date(article.value.updatedAt).toISOString() : '' },
-    
+    { property: 'og:article:tag', content: computed(() => article.value?.tags ? article.value.tags.join(', ') : '') },
+    { property: 'og:article:published_time', content: computed(() => article.value?.createdAt ? new Date(article.value.createdAt).toISOString() : '') },
+    { property: 'og:article:modified_time', content: computed(() => article.value?.updatedAt ? new Date(article.value.updatedAt).toISOString() : '') },
+
     // Twitter Card
     { name: 'twitter:card', content: 'summary_large_image' },
     { name: 'twitter:title', content: seoTitle },
@@ -240,18 +248,18 @@ useHead({
     { name: 'twitter:image:alt', content: seoTitle },
     { name: 'twitter:site', content: '@cinemapper' }, // Replace with actual Twitter handle
     { name: 'twitter:creator', content: '@cinemapper' }, // Replace with actual Twitter handle
-    
+
     // Additional SEO
     { name: 'viewport', content: 'width=device-width, initial-scale=1' },
     { name: 'format-detection', content: 'telephone=no' },
     { name: 'theme-color', content: '#1f2937' },
-    
+
     // Article Schema.org structured data hints
-    { property: 'article:published_time', content: article.value?.createdAt ? new Date(article.value.createdAt).toISOString() : '' },
-    { property: 'article:modified_time', content: article.value?.updatedAt ? new Date(article.value.updatedAt).toISOString() : '' },
-    { property: 'article:author', content: article.value?.author || 'CineMapper' },
+    { property: 'article:published_time', content: computed(() => article.value?.createdAt ? new Date(article.value.createdAt).toISOString() : '') },
+    { property: 'article:modified_time', content: computed(() => article.value?.updatedAt ? new Date(article.value.updatedAt).toISOString() : '') },
+    { property: 'article:author', content: computed(() => article.value?.author || 'CineMapper') },
     { property: 'article:section', content: 'News' },
-    { property: 'article:tag', content: article.value?.tags ? article.value.tags.join(', ') : '' },
+    { property: 'article:tag', content: computed(() => article.value?.tags ? article.value.tags.join(', ') : '') },
   ],
   link: [
     { rel: 'canonical', href: `https://news.cinemapper.com/article/${id}` },
