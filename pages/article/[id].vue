@@ -151,17 +151,30 @@ onMounted(async () => {
 })
 
 // Convert Markdown to HTML
-const renderedContent = computed(() => {
-  if (!article.value || !article.value.content) return ''
-  
-  // Use marked safely on client-side
-  if (process.client) {
-    const { marked } = require('marked')
-    return marked(article.value.content)
+const renderedContent = ref('')
+
+// Function to render markdown content
+const renderMarkdown = async (content) => {
+  if (!content || !process.client) {
+    renderedContent.value = content || ''
+    return
   }
   
-  return article.value.content
-})
+  try {
+    const { marked } = await import('marked')
+    renderedContent.value = marked(content)
+  } catch (error) {
+    console.error('Failed to load marked:', error)
+    renderedContent.value = content
+  }
+}
+
+// Watch for article content changes and render markdown
+watch(() => article.value?.content, (newContent) => {
+  if (newContent) {
+    renderMarkdown(newContent)
+  }
+}, { immediate: true })
 
 // Utility functions
 function formatDate(timestamp) {

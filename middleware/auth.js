@@ -1,8 +1,9 @@
-export default defineNuxtRouteMiddleware((to, from) => {
+export default defineNuxtRouteMiddleware(async (to, from) => {
   // Simple client-side auth check for SPA mode
   if (process.client) {
     try {
-      const { useFirebaseAuth } = require('~/composables/useFirebaseAuth')
+      // Use dynamic import instead of require
+      const { useFirebaseAuth } = await import('~/composables/useFirebaseAuth')
       const { user } = useFirebaseAuth()
       
       console.log('Auth middleware running for route:', to.path)
