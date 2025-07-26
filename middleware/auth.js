@@ -1,7 +1,7 @@
 export default defineNuxtRouteMiddleware((to, from) => {
   // Only run on client-side to avoid SSR issues
   if (process.client) {
-    // Dynamic import to avoid Firebase issues during static generation
+    // Use the composable which now handles Firebase initialization properly
     const { useFirebaseAuth } = require('~/composables/useFirebaseAuth')
     const { user } = useFirebaseAuth()
     

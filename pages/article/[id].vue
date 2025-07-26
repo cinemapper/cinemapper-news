@@ -125,8 +125,9 @@ onMounted(async () => {
     try {
       pending.value = true
       
-      // Dynamic imports to avoid SSR issues
-      const { db } = await import('~/lib/firebase')
+      // Use the new Firebase initialization method
+      const { getFirebaseServices } = await import('~/lib/firebase')
+      const { db } = await getFirebaseServices()
       const { ref: dbRef, get } = await import('firebase/database')
       
       if (db) {

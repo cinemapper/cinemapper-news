@@ -5,16 +5,16 @@ export function useFirebaseAuth() {
 
   // Client-side only Firebase operations
   if (process.client) {
-    // Dynamic imports to avoid SSR issues
-    import('firebase/auth').then(({ getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged }) => {
-      import('~/lib/firebase').then(({ auth }) => {
-        if (auth) {
-          onAuthStateChanged(auth, (u) => {
-            console.log('Auth state changed:', u ? `Logged in as ${u.email}` : 'Logged out')
-            user.value = u
-          })
-        }
-      })
+    // Use the new Firebase initialization method
+    import('~/lib/firebase').then(async ({ getFirebaseServices }) => {
+      const { auth } = await getFirebaseServices()
+      if (auth) {
+        const { onAuthStateChanged } = await import('firebase/auth')
+        onAuthStateChanged(auth, (u) => {
+          console.log('Auth state changed:', u ? `Logged in as ${u.email}` : 'Logged out')
+          user.value = u
+        })
+      }
     })
   }
 
@@ -24,7 +24,8 @@ export function useFirebaseAuth() {
     try {
       console.log('Starting Google login...')
       const { signInWithPopup, GoogleAuthProvider } = await import('firebase/auth')
-      const { auth } = await import('~/lib/firebase')
+      const { getFirebaseServices } = await import('~/lib/firebase')
+      const { auth } = await getFirebaseServices()
       
       if (!auth) throw new Error('Firebase auth not initialized')
       
@@ -43,7 +44,8 @@ export function useFirebaseAuth() {
     
     try {
       const { signOut } = await import('firebase/auth')
-      const { auth } = await import('~/lib/firebase')
+      const { getFirebaseServices } = await import('~/lib/firebase')
+      const { auth } = await getFirebaseServices()
       
       if (!auth) throw new Error('Firebase auth not initialized')
       
