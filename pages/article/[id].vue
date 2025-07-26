@@ -114,12 +114,37 @@ import { computed } from 'vue'
 const route = useRoute()
 const id = route.params.id
 
-// Server-side data fetching using the REST API
-const { data: article, pending, error } = await useFetch(`/api/articles/${id}`, {
-  server: true,
-  client: true,
-  default: () => null,
-  transform: (data) => data || null
+// Server-side and client-side data fetching with Nuxt Firebase
+const { $fire } = useNuxtApp()
+const article = ref(null)
+const pending = ref(true)
+const error = ref(null)
+
+// Use Nuxt Firebase for data fetching
+const fetchArticle = async () => {
+  try {
+    pending.value = true
+    
+    const snapshot = await $fire.database.ref(`articles/${id}`).once('value')
+    if (snapshot.exists()) {
+      const articleData = snapshot.val()
+      
+      // Check if article is published and not preview-only
+      if (articleData.published && !articleData.previewOnly) {
+        article.value = articleData
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching article:', err)
+    error.value = err
+  } finally {
+    pending.value = false
+  }
+}
+
+// Fetch data immediately
+onMounted(() => {
+  fetchArticle()
 })
 
 // Convert Markdown to HTML
@@ -177,9 +202,14 @@ function shareArticle() {
   }
 }
 
-// SEO Meta Tags - These will be rendered server-side
+// SEO Meta Tags - Static for basic SEO, will be enhanced with dynamic data
+const baseTitle = 'CineMapper News Article'
+const baseDescription = 'Read the latest news and updates from CineMapper'
+const baseImage = '/img/default-og-image.jpg'
+
+// Enhanced meta tags when article data is available
 const seoTitle = computed(() => {
-  if (!article.value) return 'CineMapper News'
+  if (!article.value) return baseTitle
   return `${article.value.title} | CineMapper News`
 })
 
@@ -190,20 +220,20 @@ const seoDescription = computed(() => {
       const text = article.value.content.replace(/[#*`]/g, '').replace(/\n/g, ' ')
       return text.slice(0, 160) + (text.length > 160 ? '...' : '')
     }
-    return 'Read the latest news and updates from CineMapper'
+    return baseDescription
   }
   return article.value.meta.description
 })
 
 const ogImage = computed(() => {
-  return article.value?.meta?.ogImage || '/img/default-og-image.jpg'
+  return article.value?.meta?.ogImage || baseImage
 })
 
 const canonicalUrl = computed(() => {
   return `https://news.cinemapper.com/article/${id}`
 })
 
-// Set page meta tags - These will be available for crawlers
+// Set page meta tags - Start with static tags, will be enhanced dynamically
 useHead({
   title: seoTitle,
   meta: [

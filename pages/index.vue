@@ -162,12 +162,41 @@
 </template>
 
 <script setup>
-// Server-side data fetching for SEO
-const { data: articles, pending, error } = await useFetch('/api/articles', {
-  server: true,
-  client: true,
-  default: () => ({}),
-  transform: (data) => data || {}
+// Server-side and client-side data fetching with Nuxt Firebase
+const { $fire } = useNuxtApp()
+const articles = ref({})
+const pending = ref(true)
+const error = ref(null)
+
+// Use Nuxt Firebase for data fetching
+const fetchArticles = async () => {
+  try {
+    pending.value = true
+    
+    const snapshot = await $fire.database.ref('articles').once('value')
+    if (snapshot.exists()) {
+      const allArticles = snapshot.val()
+      // Filter to only show published articles
+      const publishedArticles = {}
+      Object.keys(allArticles).forEach(id => {
+        const article = allArticles[id]
+        if (article.published && !article.previewOnly) {
+          publishedArticles[id] = article
+        }
+      })
+      articles.value = publishedArticles
+    }
+  } catch (err) {
+    console.error('Error fetching articles:', err)
+    error.value = err
+  } finally {
+    pending.value = false
+  }
+}
+
+// Fetch data immediately
+onMounted(() => {
+  fetchArticles()
 })
 
 // Computed properties for display
